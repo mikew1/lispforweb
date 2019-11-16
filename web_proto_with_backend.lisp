@@ -1,4 +1,4 @@
-;; (ql:quickload '(cl-who hunchentoot parenscript))
+(ql:quickload '(cl-who hunchentoot parenscript))
 
 (defpackage :retro-games
   (:use :cl :cl-who :hunchentoot :parenscript))
