@@ -106,8 +106,20 @@
 ;;      N.B. In webtales, we did layout files WITHOUT using a macro.
 ;;      Note the *macro* has keyword args, here; & args to macro are code.
 ;; [14] Usage: (standard-page (:title "Title") (..any num body fns))
-;;      Q. Why do macro's have a non s-expr-like syntax. A. wait to read on lisp.
-;; [15]
+;;      Q. Why do macro's have a non s-expr-like syntax. A. READ 'ON LISP'.
+
+
+(defun start-server (port)
+  (start (make-instance 'easy-acceptor :port port)))
+
+(push (create-prefix-dispatcher "/retro-games"
+                                'retro-games)
+      *dispatch-table*)
+
+(defun retro-games ()
+  (standard-page (:title "Retro Games")
+                 (:h1 "Top Retro Games")
+                 (:p "We'll write this later...")))
 
 
 
