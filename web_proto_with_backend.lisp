@@ -112,16 +112,14 @@
 (defun start-server (port)
   (start (make-instance 'easy-acceptor :port port)))
 
-(push (create-prefix-dispatcher "/retro-games"
-                                'retro-games)
-      *dispatch-table*)
-
-(defun retro-games ()
+(define-easy-handler (retro-games :uri "/retro-games") ()      ; [15]
   (standard-page (:title "Retro Games")
                  (:h1 "Top Retro Games")
                  (:p "We'll write this later...")))
 
-
+;; [15] This macro defuns the fn retro-games for us, & registers
+;;      it as a handler to the uri given.
+;;
 
 
 
