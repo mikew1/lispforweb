@@ -34,6 +34,12 @@
   (unless (game-stored? name)
     (push (make-instance 'game :name name) *games*)))
 
+(defmethod print-object ((object game) stream)                 ; [10]
+  (print-unreadable-object (object stream :type t)
+    (with-slots (name votes) object
+      (format stream "name: ~s with ~d votes" name votes))))
+
+
 
 ;; [1]  no user-defined superclasses, two slots.
 ;;      a game's name & number of votes.
@@ -54,4 +60,9 @@
 ;; [8]  return games sorted by votes. sort is destructive, hence copy-list.
 ;; [9]  add a game to storage. push is destructive. not functional.
 ;;      lisp is multi-paradigm, can program functionally if wish.
-;; [10]
+;; [10] add to the generic print-object for our given type
+;;      with-slots lets us reference slots as if they were variables.
+;;      without with-slots, would have to access game object twice, like so
+;;      (format stream "name: ~s with ~d votes"
+;;        (name object) (votes object))   ; <- just as good, really; simper.
+;;      He comments that often lisp has evolved to remove all duplication like this.
