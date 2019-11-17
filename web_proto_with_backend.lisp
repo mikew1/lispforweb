@@ -138,7 +138,20 @@
   (redirect "/retro-games"))
 
 (define-easy-handler (new-game :uri "/new-game") ()           ; [18]
-  (standard-page (:title "Add a new game")
+  (standard-page (:title "Add a new game"
+                 :script (ps
+                           (defvar add-form nil)
+                           (defun validate-game-name (evt)          ; [21]
+                             (when (= (@ add-form name value) "")
+                               (chain evt (prevent-default))
+                               (alert "Please enter a name.")))
+                           (defun init ()                           ; [22]
+                             (setf add-form (chain document
+                                                   (get-element-by-id "addform")))
+                             (chain add-form
+                                    (add-event-listener "submit"
+                                                validate-game-name false)))
+                           (setf (chain window onload) init)))
     (:h1 "Add a new game to the chart")
     (:form :action "/game-added" :method "post" :id "addform"
       (:p "What is the name of the game?" (:br)
@@ -161,21 +174,6 @@
 ;; [19] form target, so a post route, note with parm, though a post param.
 ;; [20] handlers register on all verbs unless specialised.
 
-
-(defun validate-game-name (evt)                               ; [21]
-  (when (= (@ add-form name value) "")  ; -> compiles to addForm.name.value
-    (chain evt (prevent-default))       ; -> compiles to evt.preventDefault()
-    (alert "Please enter a name.")))
-
-(defvar add-form nil)
-
-(defun init ()                                                ; [22]
-  (setf add-form (chain document (get-element-by-id "addform")))
-  (chain add-form (add-event-listener "submit"
-                                      validate-game-name
-                                      false)))
-(setf (chain window onload) init)      ; -> compiles to window.onload = init
-
 ;; [21] This is to do javascript validation in lisp.
 ;;      You could just write javascript. You could just use html validation.
 ;;      The '@' macro accesses object properties.
@@ -190,3 +188,8 @@
 ;;      It also means people who don't know lisp cannot read your code.
 ;;      If it came to that though, could translate it out; useful exercise.
 ;;      To compile js for any of these, just wrap the fn defs above in (ps ...)
+;; [23] On moving the js up into the easy handler: this is very bad, we need
+;;      a way out of this, the 'handler' is overloaded with js.
+;; [24] Note also the actual js here (and the game-added handler) still accept
+;;      an empty space; the validation is incomplete.
+
