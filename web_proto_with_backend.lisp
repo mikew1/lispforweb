@@ -113,13 +113,50 @@
   (start (make-instance 'easy-acceptor :port port)))
 
 (define-easy-handler (retro-games :uri "/retro-games") ()      ; [15]
-  (standard-page (:title "Retro Games")
-                 (:h1 "Top Retro Games")
-                 (:p "We'll write this later...")))
+  (standard-page
+    (:title "Top Retro Games")
+    (:h1 "Vote on your all time favourite retro games!")
+    (:p "Missing a game? Make it available for votes "
+        (:a :href "new-game" "here"))
+    (:h2 "Current stand")
+    (:div :id "chart" ; for css styling of links
+      (:ol
+        (dolist (game (games))
+          (htm                                                ; [16]
+            (:li (:a :href (format nil "vote?name=~a"
+                              (url-encode ; avoid injection attacks
+                                (name game))) "Vote!")
+                 (fmt "~A with ~d votes" (escape-string (name game))
+                                         (votes game)))))))))
+
+(define-easy-handler (vote :uri "/vote") (name)               ; [17]
+  (when (game-stored? name)
+    (vote-for (game-from-name name)))
+  (redirect "/retro-games"))
+
+(define-easy-handler (new-game :uri "/new-game") ()           ; [18]
+  (standard-page (:title "Add a new game")
+    (:h1 "Add a new game to the chart")
+    (:form :action "/game-added" :method "post" :id "addform"
+      (:p "What is the name of the game?" (:br)
+          (:input :type "text" :name "name" :class "txt"))
+      (:p (:input :type "submit" :value "Add" :class "btn")))))
+
+(define-easy-handler (game-added :uri "/game-added") (name)   ; [19]
+  (unless (or (null name) (zerop (length name)))
+    (add-game name))
+  (redirect "/retro-games"))
 
 ;; [15] This macro defuns the fn retro-games for us, & registers
-;;      it as a handler to the uri given.
-;;
+;;      it as a handler to the uri given. see hunchentoot docs for more.
+;; [16] Omitting this strange 'htm' operator gives error e.g. :li fn undefined.
+;;      cl-who docs 'syntax & semantics' explain it. like another invocation
+;;      of with-html-output. seems needed when you loop.
+;; [17] easy-handler with get param, name. it then checks for name,
+;;      applies a vote, and redirects.
+;; [18] handler for new-game which contains a form.
+;; [19] form target, so a post route, note with parm, though a post param.
+;; [20] handlers register on all verbs unless specialised.
 
 
 
