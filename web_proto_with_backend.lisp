@@ -75,7 +75,7 @@
     (:body
       (:p "A test page from cl-who"))))
 
-(defmacro standard-page ((&key title) &body body)                ; [13]
+(defmacro standard-page ((&key title script) &body body)         ; [13]
   `(with-html-output-to-string
      (*standard-output* nil :prologue t :indent t)               ; [14]
      (:html :lang "en"
@@ -84,7 +84,10 @@
           (:title ,title)
           (:link :type "text/css"
                  :rel "stylesheet"
-                 :href "/retro.css"))
+                 :href "/retro.css")
+          ,(when script
+             `(:script :type "text/javascript"
+                       (str ,script))))
         (:body
           (:div :id "header" ; Retro games header
             (:img :src "/logo.jpg"
@@ -159,4 +162,31 @@
 ;; [20] handlers register on all verbs unless specialised.
 
 
+(defun validate-game-name (evt)                               ; [21]
+  (when (= (@ add-form name value) "")  ; -> compiles to addForm.name.value
+    (chain evt (prevent-default))       ; -> compiles to evt.preventDefault()
+    (alert "Please enter a name.")))
 
+(defvar add-form nil)
+
+(defun init ()                                                ; [22]
+  (setf add-form (chain document (get-element-by-id "addform")))
+  (chain add-form (add-event-listener "submit"
+                                      validate-game-name
+                                      false)))
+(setf (chain window onload) init)      ; -> compiles to window.onload = init
+
+;; [21] This is to do javascript validation in lisp.
+;;      You could just write javascript. You could just use html validation.
+;;      The '@' macro accesses object properties.
+;;      The 'chain' macro chains function calls on an object instance.
+;;      expands to: if(addForm.name.value === '') { evt.preventDefault(); ... }
+;; [22] We could put js inline above, but let's not. Instead, we use onload.
+;;      We're setting a lisp variable add-form to the dom element.
+;;      expands to: addForm = document.getElementById("addform")
+;;                  addForm.addEventListener('submit', validateGameName, false)
+;;                  window.onload = init;
+;;      Note how doing this has full prerequisite of knowledge of javascript.
+;;      It also means people who don't know lisp cannot read your code.
+;;      If it came to that though, could translate it out; useful exercise.
+;;      To compile js for any of these, just wrap the fn defs above in (ps ...)
