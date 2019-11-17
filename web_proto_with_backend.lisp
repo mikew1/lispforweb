@@ -139,7 +139,19 @@
 
 (define-easy-handler (new-game :uri "/new-game") ()           ; [18]
   (standard-page (:title "Add a new game"
-                 :script (separate-js))
+                 :script (ps
+                           (defvar add-form nil)
+                           (defun validate-game-name (evt)          ; [21]
+                             (when (= (@ add-form name value) "")
+                               (chain evt (prevent-default))
+                               (alert "Please enter a name.")))
+                           (defun init ()                           ; [22]
+                             (setf add-form (chain document
+                                                   (get-element-by-id "addform")))
+                             (chain add-form
+                                    (add-event-listener "submit"
+                                                validate-game-name false)))
+                           (setf (chain window onload) init)))
     (:h1 "Add a new game to the chart")
     (:form :action "/game-added" :method "post" :id "addform"
       (:p "What is the name of the game?" (:br)
@@ -150,22 +162,6 @@
   (unless (or (null name) (zerop (length name)))
     (add-game name))
   (redirect "/retro-games"))
-
-
-(defun separate-js ()
-  (ps
-    (defvar add-form nil)
-    (defun validate-game-name (evt)          ; [21]
-     (when (= (@ add-form name value) "")
-       (chain evt (prevent-default))
-       (alert "Please enter a name.")))
-    (defun init ()                           ; [22]
-     (setf add-form (chain document
-                           (get-element-by-id "addform")))
-     (chain add-form
-            (add-event-listener "submit"
-                        validate-game-name false)))
-    (setf (chain window onload) init)))
 
 ;; [15] This macro defuns the fn retro-games for us, & registers
 ;;      it as a handler to the uri given. see hunchentoot docs for more.
