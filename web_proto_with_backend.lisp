@@ -1,7 +1,8 @@
-(ql:quickload '(cl-who hunchentoot parenscript))
+; works fine with SBCL (but not CCL).
+(ql:quickload '(cl-who hunchentoot parenscript cl-mongo))
 
 (defpackage :retro-games
-  (:use :cl :cl-who :hunchentoot :parenscript))
+  (:use :cl :cl-who :hunchentoot :parenscript :cl-mongo))
 
 (in-package :retro-games)
 
@@ -9,28 +10,58 @@
   ((name  :reader name
           :initarg :name)
    (votes :accessor votes
+          :initarg :votes
           :initform 0)))
+
+(cl-mongo:db.use "games")
+(defparameter *game-collection* "game")                        ; [1a]
+
+(defun unique-index-on (field)
+  (db.ensure-index *game-collection*
+                   ($ field 1)
+                   :unique t))
+
+(unique-index-on "name")
+
+(defun doc->game (game-doc)                                    ; [1b]
+  (make-instance 'game :name  (get-element "name" game-doc)
+                       :votes (get-element "votes" game-doc)))
 
 (defvar many-lost-hours (make-instance 'game :name "Tetris"))  ; [2]
 
-(defmethod vote-for (user-selected-game)                       ; [3]
-  (incf (votes user-selected-game)))
 
-(defvar *games* nil)                                           ; [4]
+(defmethod vote-for (game)                                     ; [3]
+  (incf (votes game)))
+
+(defmethod vote-for :after (game)                              ; [3a]
+  (let ((game-doc (game->doc game)))
+    (db.update *game-collection* ($ "name" (name game)) game-doc)))
+
 
 (defun game-from-name (name)                                   ; [5]
-  (find name *games* :test #'string-equal                      ; [6]
-        :key #'name))
+  (let ((found-games (docs (db.find *game-collection*
+                                    ($ "name" name)))))
+    (when found-games
+      (doc->game (first found-games)))))
 
 (defun game-stored? (game-name)                                ; [7]
   (game-from-name game-name))
 
 (defun games ()                                                ; [8]
-  (sort (copy-list *games*) #'> :key #'votes))
+  (mapcar #'doc->game
+          (docs (iter
+                  (db.sort *game-collection*
+                           :all
+                           :field "votes"
+                           :asc nil)))))
 
 (defun add-game (name)                                         ; [9]
-  (unless (game-stored? name)
-    (push (make-instance 'game :name name) *games*)))
+  (let ((game (make-instance 'game :name name)))
+    (db.insert *game-collection* (game->doc game))))
+
+(defun game->doc (game)                                        ; [9a]
+  ($ ($ "name" (name game))
+     ($ "votes" (votes game))))
 
 (defmethod print-object ((object game) stream)                 ; [10]
   (print-unreadable-object (object stream :type t)
@@ -43,20 +74,35 @@
 ;;      reader creates read, accessor creates read and write.
 ;;      here, we just use general names, not concerned with collisions.
 ;;      usually would be game-name & game-votes.
+;; [1a] database is called games. collection, like table, is called game.
+;;      we now refer to the collection using *game-collection* in our code.
+;; [1b] get-element is provided by cl-mongo to extract fields in a retrieved
+;;      document. since we now create an instance from mongo document,
+;;      we added an initarg to votes.
 ;; [2]  defvar to define a fixed thing, many-lost-hours.
 ;;      defines it only if it doesn't already exist.
-;; [3]  defines a generic with a typed arg; could have been just a fn.
-;;      this guy is no pedagogue. but it works, fair enough. power.
-;; [4]  in-memory persistence to start with.
-;; [5]  written immediately to encapsulate because we know we'll later
-;;      move to a db.
-;; [6]  find takes an item and a sequence. this says find the item
-;;      of name name, testing using string-equal.
+;; [3]  now its explained why he used a generic and not just a function.
+;;      this generic dispatching on game remains, but we add an :after.
+;;      this first, original function simply updates the votes in memory.
+;; [3a] a method combination to persist the given change. so simple!
+;;      the benefit of adding an :after is that the generic itself does
+;;      an important action, updating the state in memory. but then the
+;;      after updates the persistent storage. this is nice because it
+;;      embodies the open closed principle, we add functionality without
+;;      modifying the existing class at all. open to extension, closed to mod.
+;; [4]  in-memory persistence to start with, defvar *games* (now removed).
+;; [5]  initial in-memory store now replaced with mongo.
+;;      "db.find behaves like mongo's findOne.
+;;      So when found, we know there can be only one"
 ;; [7]  if game-from-name returns nil, that means game isn't stored.
 ;;      this fn is written just to clarify intent.
-;; [8]  return games sorted by votes. sort is destructive, hence copy-list.
-;; [9]  add a game to storage. push is destructive. not functional.
-;;      lisp is multi-paradigm, can program functionally if wish.
+;; [8]  return games sorted by votes. now modified for mongo.
+;; [9]  add a game to storage. now modified to insert to mongo.
+;;      'the extra step of instantiating a clos object isn't really necessary',
+;;      but he does this 'to keep related functions on same level of abstraction'
+;; [9a] create a document and add the fields name and votes to it.
+;;      this is a cl-mongo macro shortcut for declarative style.
+;;      see p27 for the longhand if stuck as to what this means.
 ;; [10] add to the generic print-object for our given type
 ;;      with-slots lets us reference slots as if they were variables.
 ;;      without with-slots, would have to access game object twice, like so
@@ -192,4 +238,3 @@
 ;;      a way out of this, the 'handler' is overloaded with js.
 ;; [24] Note also the actual js here (and the game-added handler) still accept
 ;;      an empty space; the validation is incomplete.
-
